@@ -42,6 +42,7 @@
         "influxdb",
         "jc",
         "jsonschema",
+ 	"loguru",
         "matplotlib",
         "mitmproxy==9.0.1",
         "nested_lookup",
