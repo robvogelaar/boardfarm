@@ -95,21 +95,32 @@ class SSHConnection(BoardfarmPexpect):
         """
         if password is None:
             password = self._password
-        if self.expect(
-            ["password:", pexpect.EOF, pexpect.TIMEOUT],
-        ):
-            raise DeviceConnectionError(_CONNECTION_FAILED_STR)
-        self.sendline(password)
-        if (
-            self.expect(
-                [
-                    pexpect.EOF,
-                    pexpect.TIMEOUT,
-                    *self._shell_prompt,
-                ],
-            )
-            < _CONNECTION_ERROR_THRESHOLD
-        ):
+
+        # For key-based auth, we might see shell prompt immediately
+        # For password auth, we'll see password prompt first
+        idx = self.expect(
+            ["password:", *self._shell_prompt, pexpect.EOF, pexpect.TIMEOUT],
+        )
+
+        if idx == 0:
+            # Password prompt seen - password-based authentication
+            self.sendline(password)
+            if (
+                self.expect(
+                    [
+                        pexpect.EOF,
+                        pexpect.TIMEOUT,
+                        *self._shell_prompt,
+                    ],
+                )
+                < _CONNECTION_ERROR_THRESHOLD
+            ):
+                raise DeviceConnectionError(_CONNECTION_FAILED_STR)
+        elif idx < len(self._shell_prompt) + 1:
+            # Shell prompt seen immediately - key-based authentication successful
+            pass
+        else:
+            # EOF or TIMEOUT - connection failed
             raise DeviceConnectionError(_CONNECTION_FAILED_STR)
 
     def execute_command(self, command: str, timeout: int = -1) -> str:

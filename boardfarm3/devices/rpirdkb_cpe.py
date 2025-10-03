@@ -125,13 +125,29 @@ class RPiRDKBHW(CPEHW):
         :param device_name: device name
         :type device_name: str
         """
-        self._console = connection_factory(
-            connection_type=str(self._config.get("connection_type")),
-            connection_name=f"{device_name}.console",
-            conn_command=self._config["conn_cmd"][0],
-            save_console_logs=self._cmdline_args.save_console_logs,
-            shell_prompt=self._shell_prompt,
-        )
+        connection_type = str(self._config.get("connection_type"))
+
+        # Build connection parameters based on connection type
+        conn_params = {
+            "connection_type": connection_type,
+            "connection_name": f"{device_name}.console",
+            "save_console_logs": self._cmdline_args.save_console_logs,
+            "shell_prompt": self._shell_prompt,
+        }
+
+        # Add connection-specific parameters
+        if connection_type == "serial":
+            # Serial connection needs conn_command
+            conn_params["conn_command"] = self._config["conn_cmd"][0]
+        elif connection_type in ("ssh_connection", "authenticated_ssh"):
+            # SSH connection needs ip_addr, username, port, password
+            conn_params["ip_addr"] = self._config["ipaddr"]
+            conn_params["username"] = self._config["username"]
+            conn_params["port"] = self._config.get("port", 22)
+            if "password" in self._config:
+                conn_params["password"] = self._config["password"]
+
+        self._console = connection_factory(**conn_params)
         self._console.login_to_server()
         try:
             # on connection the serial console can be very dirty

@@ -1,0 +1,15 @@
+{
+    "rpi4-rdkb-ssh": {
+        "devices": [
+            {
+                "connection_type": "ssh_connection",
+                "ipaddr": "192.168.2.109",
+                "port": 22,
+                "username": "root",
+                "gui_password": "admin",
+                "name": "board",
+                "type": "bf_rpi4rdkb"
+            }
+        ]
+    }
+}

@@ -37,7 +37,7 @@ def connection_factory(
     connection_obj = connection_dispatcher.get(connection_type)
     if connection_obj is not None and callable(connection_obj):
         if connection_type == "ssh_connection":
-            kwargs.pop("password")
+            kwargs.pop("password", None)  # Remove password if present (use SSH keys)
         return connection_obj(connection_name, **kwargs)
     # Handle unsupported connection types
     msg = f"Unsupported connection type: {connection_type}"
