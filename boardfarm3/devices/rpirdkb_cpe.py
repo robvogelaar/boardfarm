@@ -21,6 +21,7 @@ from boardfarm3.exceptions import (
 )
 from boardfarm3.lib.connection_factory import connection_factory
 from boardfarm3.lib.cpe_sw import CPESwLibraries
+from boardfarm3.lib.hal.rpirdkb_wifi import RPiRDKBWiFi
 from boardfarm3.lib.power import get_pdu
 from boardfarm3.lib.utils import retry_on_exception
 from boardfarm3.templates.acs import ACS
@@ -247,13 +248,14 @@ class RPiRDKBSW(CPESwLibraries):  # pylint: disable=R0904
         # use sparingly
         self._console.execute_command("stty columns 200; export TERM=xterm")
 
-    @property
+    @cached_property
     def wifi(self) -> WiFiHal:
         """Return instance of WiFi component of RPiRDKB software.
 
-        :raises NotSupportedError: WiFi is not enabled on container...yet!!
+        :return: WiFi HAL instance
+        :rtype: WiFiHal
         """
-        raise NotSupportedError
+        return RPiRDKBWiFi(self)
 
     @property
     def version(self) -> str:
