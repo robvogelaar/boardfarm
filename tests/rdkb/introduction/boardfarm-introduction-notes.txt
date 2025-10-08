@@ -1,0 +1,289 @@
+
+═══════════════════════════════════════════════════════════════════════════════
+1) HISTORY
+═══════════════════════════════════════════════════════════════════════════════
+
+Originally developed by a team at Qualcomm about 10 years ago to assist in
+automated router testing.
+
+THE CORE CONCEPT
+────────────────────────────────────────────────────────────────────────────────
+
+The idea is to have literally a farm of boards sitting in a rack, that can then
+be selected, powered up and connected to, and then run an interactive session
+through the serial port or SSH, using the expect CLI automation tool.
+
+This also could spin up small Debian containers acting as:
+  • WAN device - performs DHCP-based config
+  • LAN device - runs different network client actions
+
+It could also do things like firmware upgrades when there is a new release,
+hooked into Jenkins build server, etc.
+
+IMPLEMENTATION
+────────────────────────────────────────────────────────────────────────────────
+
+This was written in Python and Bash.
+
+Python - very convenient language, easy to learn and use, with a very large
+ecosystem behind it.
+
+EVOLUTION
+────────────────────────────────────────────────────────────────────────────────
+
+And has evolved dramatically in its capabilities and architecture structure.
+
+It is now able to manage basically every back office equipment component that
+you can think of in a full end-to-end lab environment, with dedicated support
+functions that can be used in your test cases.
+
+Such as depicted in this picture.
+
+CORE TECHNOLOGY: EXPECT
+────────────────────────────────────────────────────────────────────────────────
+
+So initially the core component that it was built around was Expect.
+
+Python Expect is a Python module that automates interactive command-line
+applications by:
+  • Spawning processes
+  • Waiting for expected output patterns
+  • Sending responses automatically
+
+It's commonly used for:
+  • Automating SSH/FTP sessions
+  • Controlling CLI programs
+  • Testing interactive applications
+  • Handling prompts, etc.
+
+MAINTENANCE & DEVELOPMENT
+────────────────────────────────────────────────────────────────────────────────
+
+Boardfarm has been extended by a dedicated team within Liberty Global and is
+still being actively maintained by a core team within Infosys (which I am not
+part of).
+
+This team has managed to put into place a very powerful and flexible
+architecture making it possible to be re-used and fit within a new environment
+such as the Charter environment that is being proposed.
+
+TESTING CAPABILITIES
+────────────────────────────────────────────────────────────────────────────────
+
+Tests can be as simple as "ping google.com", or as complicated as:
+  • Analyzing ICMP packet data
+  • Checking a visual regression on a WebUI by using things like Selenium and
+    image analysis tools
+
+We also integrate with things like:
+  • CDRouter
+  • Robot Testing Framework
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2) ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+The Boardfarm architecture has evolved and is now built around the concept of
+devices and a central device manager.
+
+DEVICE CONCEPT
+────────────────────────────────────────────────────────────────────────────────
+
+A device is a representation of a component inside the end-to-end test
+environment, such as:
+  • CPE device
+  • ACS
+  • LAN client
+
+THE GOAL
+────────────────────────────────────────────────────────────────────────────────
+
+To standardize on the interfaces of all of these components, and to manage the
+diversity of many different components coming from different vendors or being
+configured differently.
+
+DYNAMIC MANAGEMENT
+────────────────────────────────────────────────────────────────────────────────
+
+Boardfarm can dynamically manage the test environment, making automatic version
+selections through smart configurations.
+
+Devices can be extended or new devices can be written based on templates and
+abstract base classes - i.e., Device classes that can be inherited and
+customized.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3) PYTEST
+═══════════════════════════════════════════════════════════════════════════════
+
+At some point Boardfarm was made to work with the pytest testing framework.
+
+PYTEST OVERVIEW
+────────────────────────────────────────────────────────────────────────────────
+
+Pytest is a popular testing framework for Python that makes it easy to write
+and run tests. It's known for being simple to use while also being powerful and
+flexible.
+
+Features include:
+  • Automatic test discovery
+  • Tons of extensions
+  • Better reporting, etc.
+
+PYTEST FIXTURES
+────────────────────────────────────────────────────────────────────────────────
+
+In pytest, pytest fixtures are a core feature that provide a way to set up test
+data, resources, or preconditions that your tests need. You can think of them
+as reusable components that prepare things before your test runs.
+
+INTEGRATION ARCHITECTURE
+────────────────────────────────────────────────────────────────────────────────
+
+So in addition to Boardfarm itself as a standalone Python package, we have a
+second component which is the pytest plugin for Boardfarm.
+
+So we have:
+  1. pytest
+  2. pytest-boardfarm
+  3. boardfarm
+
+What happens is that pytest will load the pytest-boardfarm plugin, and then
+your tests have access to devices using the device manager via a Python fixture.
+
+That means that in a few lines of code we can open a CPE device instance and
+for instance read a datamodel parameter.
+
+KEY FEATURES
+────────────────────────────────────────────────────────────────────────────────
+
+• Seamless integration with Pytest and Robot Framework
+• Presenting the established environment as a fixture
+
+LIFECYCLE MANAGEMENT
+────────────────────────────────────────────────────────────────────────────────
+
+Boardfarm also participates in the synchronization of a full reboot and
+provisioning scheme, using hooks which can run on a part of the lifecycle.
+
+Manages boot/provision lifecycle, devices participate via hooks.
+
+CONNECTIVITY
+────────────────────────────────────────────────────────────────────────────────
+
+Boardfarm connects to devices using a connection library where we have support
+for:
+  • Serial
+  • SSH
+  • Telnet
+  • SNMP
+  • CLI connections
+
+CONTAINER ORCHESTRATION
+────────────────────────────────────────────────────────────────────────────────
+
+Boardfarm is also able to orchestrate containerized environments, such as being
+able to manage:
+  • Docker application containers
+  • Linux system containers
+
+Minimize hardware infrastructure requirements and bottlenecks.
+
+CORE PRINCIPLES
+────────────────────────────────────────────────────────────────────────────────
+
+• Automated instantiation (install, config, teardown) of the desired test
+  environment across embedded and cloud systems
+
+• Test case portability: build once, use many times
+
+• Minimize cost of operation via standard test APIs
+  → Maximize reuse of automated regression tests
+
+• To support transition, it is also possible to use the vendor-specific
+  interface
+
+• Extensible through a plug-in architecture
+
+• Add new device classes based on templates
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4) TEST SUITE
+═══════════════════════════════════════════════════════════════════════════════
+
+But wait, there is more!
+
+COMPREHENSIVE TEST COMPONENTS
+────────────────────────────────────────────────────────────────────────────────
+
+Not only that, the team has over the years also developed the typical
+components you will find in a test suite:
+  • Test cases
+  • Test helpers
+  • Test stubs
+  • Test config files
+  • Test data
+
+OPEN SOURCE TRANSITION
+────────────────────────────────────────────────────────────────────────────────
+
+And we are in the midst of opening up the test suite as well. You will find a
+lot of vendor and OEM specific extensions which need to be refactored out, etc.
+
+But we will have a test suite of around 600 test cases organized into
+categories such as:
+
+  • TR-069
+  • Web interface
+  • Telemetry
+  • Voice
+  • Stability
+  • DOCSIS provisioning
+  • RDK-B specific (e.g., self heal)
+
+USE-CASE BUILDING BLOCKS
+────────────────────────────────────────────────────────────────────────────────
+
+Use-case building blocks enable fast automation scripting.
+
+Boardfarm has always been partially open source. The internal pieces are being
+opened up. Can find it on pypi.org.
+
+ARCHITECTURE LAYERS
+────────────────────────────────────────────────────────────────────────────────
+
+Test execution management:
+
+  • Test cases: complex actions as sequence of use cases
+  • Use cases: standardized compound routines unitary across devices
+  • Device classes: standardized API, device interaction protocol, modular
+    extensions: plugin management and hook calling
+
+FRAMEWORK LAYERS (Top to Bottom)
+────────────────────────────────────────────────────────────────────────────────
+
+  ┌─────────────────────────────────────────────┐
+  │         Test Cases                          │
+  ├─────────────────────────────────────────────┤
+  │         Use Cases (Reusable Blocks)         │
+  ├─────────────────────────────────────────────┤
+  │         Pytest Fixtures (Device Manager)    │
+  ├─────────────────────────────────────────────┤
+  │         Device Templates (Abstract          │
+  │         Interfaces)                         │
+  ├─────────────────────────────────────────────┤
+  │         Vendor Plugins (Concrete            │
+  │         Implementations)                    │
+  └─────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5) TEST PRIMITIVES
+═══════════════════════════════════════════════════════════════════════════════
+
+(See primitives.md nd other docs)
+
+
