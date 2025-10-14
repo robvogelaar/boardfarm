@@ -9,10 +9,13 @@ class IptablesParser:
     """Parse the iptables from table format to dict."""
 
     def _get_headers(self, ip_tables: str) -> list[str]:
+        header = []
         for line in ip_tables.splitlines():
             if line.startswith("num"):
                 header = line.split()
                 break
+        if not header:
+            raise ValueError(f"Failed to parse iptables output: {ip_tables[:200]}")
         return header
 
     def iptables(self, ip_tables: str) -> dict[str, list[dict]]:

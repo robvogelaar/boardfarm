@@ -12,9 +12,11 @@ def test_get_iptables_list(device_manager):
     rules = board.sw.firewall.get_iptables_list("", "INPUT")
 
     print(f"\nIPv4 Firewall Rules (filter/INPUT):")
-    print(f"  Total rules: {len(rules)}")
-    for i, rule in enumerate(rules[:5], 1):
-        print(f"  {i}. {rule}")
+    print(f"  Total chains: {len(rules)}")
+    for chain_name, chain_rules in rules.items():
+        print(f"  {chain_name}: {len(chain_rules)} rules")
+        for i, rule in enumerate(chain_rules[:3], 1):
+            print(f"    {i}. {rule}")
 
 
 @pytest.mark.env_req({"environment_def": {"board": {"model": "bf_rpi4rdkb"}}})
@@ -78,7 +80,7 @@ def test_add_and_remove_drop_rule(device_manager):
     print("  OK Added drop rule")
 
     rules = board.sw.firewall.get_iptables_list("", "INPUT")
-    found = any(test_ip in str(rule) for rule in rules)
+    found = any(test_ip in str(rule) for chain_rules in rules.values() for rule in chain_rules)
     if found:
         print(f"  OK Rule found in iptables")
 

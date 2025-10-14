@@ -95,7 +95,7 @@ def start_tcpdump(  # noqa: PLR0913
         output = console.execute_command(f"{command} 'portrange {port}' {filter_str} &")
     else:
         output = console.execute_command(f"{command} {filter_str} &")
-    if console.expect_exact([f"tcpdump: listening on {interface}", pexpect.TIMEOUT]):
+    if console.expect_exact([f"tcpdump: listening on {interface}", pexpect.TIMEOUT], timeout=5):
         msg = f"Failed to start tcpdump on {interface}"
         raise ValueError(msg)
     return re.search(r"(\[\d+\]\s(\d+))", output)[2]
@@ -254,13 +254,13 @@ class IptablesFirewall:
 
         :param opts: command line arguments for iptables command
         :type opts: str
-        :param extra_opts: extra command line arguments for iptables command
+        :param extra_opts: extra command line arguments for iptables command (e.g., chain name like "INPUT")
         :type extra_opts: str
         :return: iptables rules dictionary
         :rtype: Dict[str, List[Dict]]
         """
         return IptablesParser().iptables(
-            self._console.execute_command(f"iptables {opts} {extra_opts}"),
+            self._console.execute_command(f"iptables {opts} -L {extra_opts} --line-number -nv"),
         )
 
     def is_iptable_empty(self, opts: str = "", extra_opts: str = "") -> bool:
@@ -284,13 +284,13 @@ class IptablesFirewall:
 
         :param opts: command line arguments for ip6tables command
         :type opts: str
-        :param extra_opts: extra command line arguments for ip6tables command
+        :param extra_opts: extra command line arguments for ip6tables command (e.g., chain name like "INPUT")
         :type extra_opts: str
         :return: ip6tables rules dictionary
         :rtype: Dict[str, List[Dict]]
         """
         return IptablesParser().ip6tables(
-            self._console.execute_command(f"ip6tables {opts} {extra_opts}"),
+            self._console.execute_command(f"ip6tables {opts} -L {extra_opts} --line-number -nv"),
         )
 
     def get_iptables_policy(

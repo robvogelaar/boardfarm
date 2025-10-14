@@ -1,0 +1,14 @@
+{
+    "rpi4-rdkb-1": {
+        "devices": [
+            {
+                "conn_cmd": [
+                    "picocom -b 115200 /dev/ttyUSB0"
+                ],
+                "connection_type": "serial",
+                "name": "board",
+                "type": "bf_rpi4rdkb"
+            }
+        ]
+    }
+}

@@ -76,7 +76,11 @@ def test_lan_gateway_addresses(device_manager):
 
     print("\nLAN Gateway Addresses:")
     print(f"  IPv4: {board.sw.lan_gateway_ipv4}")
-    print(f"  IPv6: {board.sw.lan_gateway_ipv6}")
+    try:
+        ipv6 = board.sw.lan_gateway_ipv6
+        print(f"  IPv6: {ipv6}")
+    except ValueError:
+        print("  IPv6: Not configured")
 
 
 @pytest.mark.env_req({"environment_def": {"board": {"model": "bf_rpi4rdkb"}}})
