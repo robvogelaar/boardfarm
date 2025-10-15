@@ -17,6 +17,7 @@ from boardfarm3.exceptions import (
     BoardfarmException,
     ConfigurationFailure,
     DeviceBootFailure,
+    DeviceNotFound,
     NotSupportedError,
 )
 from boardfarm3.lib.connection_factory import connection_factory
@@ -545,13 +546,14 @@ class RPiRDKBCPE(CPE, BoardfarmDevice):
         self.hw.connect_to_consoles(self.device_name)
         self._sw = RPiRDKBSW(self._hw)
         _LOGGER.info("Booting %s(%s) device", self.device_name, self.device_type)
-        if provisioner := device_manager.get_device_by_type(
-            Provisioner,  # type: ignore[type-abstract]
-        ):
+        try:
+            provisioner = device_manager.get_device_by_type(
+                Provisioner,  # type: ignore[type-abstract]
+            )
             provisioner.provision_cpe(
                 cpe_mac=self.hw.mac_address, dhcpv4_options={}, dhcpv6_options={}
             )
-        else:
+        except DeviceNotFound:
             _LOGGER.warning(
                 "Skipping CPE provisioning. Provisioner for %s(%s) not found!",
                 self.device_name,
