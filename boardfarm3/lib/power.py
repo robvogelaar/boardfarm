@@ -1,5 +1,6 @@
 """Power module."""
 
+from boardfarm3.devices.power.kasa import KasaPDU
 from boardfarm3.devices.power.net_io import NetIOPDU
 from boardfarm3.devices.power.raritan_pdu import RaritanPDU
 from boardfarm3.templates.pdu import PDU
@@ -8,6 +9,7 @@ pdu_dict = {
     "px2://": RaritanPDU,
     "px3://": RaritanPDU,
     "netio://": NetIOPDU,
+    "kasa://": KasaPDU,
 }
 
 
@@ -18,9 +20,10 @@ def get_pdu(uri: str) -> PDU:
         "type://ip[:port]; outlet"
 
         "netio://10.64.40.34; 2"
-        "px2://10.71.10.53:23; 2",
-        "px3://10.71.10.53:23; 2",
-        "eaton://10.71.10.53:23; 2"
+        "px2://10.71.10.53:23; 2"
+        "px3://10.71.10.53:23; 2"
+        "kasa://192.168.2.101"
+        "kasa://192.168.2.102:user@example.com:password123"
         more to come....
 
     :param uri: a uri with the PDU details

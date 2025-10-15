@@ -7,7 +7,8 @@
                 ],
                 "connection_type": "serial",
                 "name": "board",
-                "type": "bf_rpi4rdkb"
+                "type": "bf_rpi4rdkb",
+                "powerport": "kasa://192.168.2.103"
             }
         ]
     }

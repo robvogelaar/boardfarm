@@ -54,6 +54,7 @@ dependencies = [
     "debtcollector",
     "scikit-image",  # image comparison
     "opencv-python", # image comparison
+    "python-kasa",   # TP-Link Kasa smart plug control
 ]
 
 [project.optional-dependencies]

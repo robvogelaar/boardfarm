@@ -258,23 +258,57 @@ pytest \
 
 This defines the expected device model for test environment requirements.
 
-## Troubleshooting
+## Power Device Control
 
-### Serial Connection Issues
+The test suite supports remote power control via TP-Link Kasa smart plugs. This allows automated power cycling of test devices.
 
-- Ensure `/dev/ttyUSB0` (or your serial device) has proper permissions: `sudo chmod 666 /dev/ttyUSB0`
-- Verify the device is connected and the serial port is correct: `ls -l /dev/ttyUSB*`
-- Check the baud rate matches your device (115200 is standard for RDK-B)
+### Configuration
 
-### SSH Connection Issues
+Add a `powerport` field to your device configuration with a `kasa://` URI:
 
-- Verify the IP address is correct and reachable: `ping 192.168.2.111`
-- Ensure SSH key is set up or use `authenticated_ssh` with password
-- Check SSH service is running on the device
-- Verify firewall rules allow SSH connections
+```json
+{
+    "rpi4-rdkb-1": {
+        "devices": [
+            {
+                "connection_type": "ssh_connection",
+                "ipaddr": "192.168.2.111",
+                "port": 22,
+                "username": "root",
+                "name": "board",
+                "type": "bf_rpi4rdkb",
+                "powerport": "kasa://192.168.2.103"
+            }
+        ]
+    }
+}
+```
 
-### Test Failures
+### Running Power Tests
 
-- Some tests may be skipped if certain features are not available (e.g., SNMP, IPv6)
-- Use `-v` or `-vv` flags for more verbose output
-- Check device logs for any error messages during test execution
+Power tests are located in `tests/pdu/test_kasa_power.py`. Run these tests with `--skip-boot` to avoid power cycling during test setup:
+
+```bash
+# Run all Kasa power tests (SSH connection)
+pytest \
+    -s \
+    --disable-warnings \
+    --board-name rpi4-rdkb-1 \
+    --env-config ./boardfarm3/configs/boardfarm_env_rpi4rdkb.json \
+    --inventory-config ./boardfarm3/configs/boardfarm_inv_rpi4rdkb_ssh.json \
+    --skip-boot \
+    ./tests/pdu/test_kasa_power.py
+
+# Run only the config-based power test
+pytest \
+    -s \
+    --disable-warnings \
+    --board-name rpi4-rdkb-1 \
+    --env-config ./boardfarm3/configs/boardfarm_env_rpi4rdkb.json \
+    --inventory-config ./boardfarm3/configs/boardfarm_inv_rpi4rdkb_ssh.json \
+    --skip-boot \
+    ./tests/pdu/test_kasa_power.py::test_power_cycle_from_config
+```
+
+**Note:** Power tests use `--skip-boot` to prevent the device from being power cycled during the boot sequence, which would interfere with the power control tests themselves.
+
