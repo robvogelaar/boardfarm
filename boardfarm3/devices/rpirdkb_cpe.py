@@ -626,6 +626,12 @@ class RPiRDKBCPE(CPE, BoardfarmDevice):
         self._hw.connect_to_consoles(self.device_name)
         self._sw = RPiRDKBSW(self._hw)
 
+        # Set up terminal width to prevent command wrapping
+        try:
+            self._sw._set_up_terminal()
+        except Exception as e:
+            _LOGGER.warning("Failed to set up terminal: %s", e)
+
     def get_interactive_consoles(self) -> dict[str, BoardfarmPexpect]:
         """Get interactive consoles of the device.
 
