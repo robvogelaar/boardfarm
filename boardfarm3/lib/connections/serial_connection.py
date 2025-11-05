@@ -59,7 +59,9 @@ class SerialConnection(LocalCmd):
             name, conn_command, save_console_logs, shell_prompt, args, **kwargs
         )
         try:
-            self.expect("Terminal ready", 5)
+            # Wait for connection ready - picocom shows "Terminal ready",
+            # ser2net shows "ser2net port", or we might get shell prompt directly
+            self.expect(["Terminal ready", "ser2net port"] + self._shell_prompt, 5)
         except EOF as exc:
             raise DeviceConnectionError(self.before) from exc
 
