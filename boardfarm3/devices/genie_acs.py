@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from argparse import Namespace
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urljoin
 
@@ -55,6 +56,21 @@ class GenieACS(LinuxDevice, ACS):
         logging.getLogger("httpx").setLevel(logging.WARNING)
         logging.getLogger("httpcore").setLevel(logging.WARNING)
 
+    def _connect(self) -> None:
+        """Connect to GenieACS container via SSH (for administration).
+
+        Console is optional - only connect if connection_type is specified.
+        TR-069 operations use HTTP API regardless of console availability.
+        """
+        if self.config.get("connection_type"):
+            # Console access provided for administration (logs, tcpdump, etc.)
+            super()._connect()
+
+    def _disconnect(self) -> None:
+        """Disconnect console if connected."""
+        if hasattr(self, "_console") and self._console:
+            super()._disconnect()
+
     def _init_nbi_client(self) -> None:
         if self._client is None:
             self._base_url = (
@@ -95,6 +111,10 @@ class GenieACS(LinuxDevice, ACS):
         )
         self._connect()
         self._init_nbi_client()
+        # Set CPE ID from config if available (for standalone ACS usage)
+        if all(key in self.config for key in ("oui", "product_class", "serial")):
+            self._cpeid = f"{self.config['oui']}-{self.config['product_class']}-{self.config['serial']}"
+            _LOGGER.info("Set CPE ID from ACS config: %s", self._cpeid)
 
     @hookimpl
     def boardfarm_server_boot(self) -> None:
@@ -102,13 +122,18 @@ class GenieACS(LinuxDevice, ACS):
         _LOGGER.info("Booting %s(%s) device", self.device_name, self.device_type)
         self._connect()
         self._init_nbi_client()
+        # Set CPE ID from config if available (for standalone ACS usage)
+        if all(key in self.config for key in ("oui", "product_class", "serial")):
+            self._cpeid = f"{self.config['oui']}-{self.config['product_class']}-{self.config['serial']}"
+            _LOGGER.info("Set CPE ID from ACS config: %s", self._cpeid)
 
     @hookimpl
     def boardfarm_shutdown_device(self) -> None:
         """Boardfarm hook implementation to shutdown ACS device."""
         _LOGGER.info("Shutdown %s(%s) device", self.device_name, self.device_type)
         self._disconnect()
-        self._client.close()
+        if self._client:
+            self._client.close()
 
     # FIXME:I'm not a booting hook and I don't belong here!  # noqa: FIX001
     # BOARDFARM-4920
@@ -537,22 +562,114 @@ class GenieACS(LinuxDevice, ACS):
                 ]
 
     def delete_file(self, filename: str) -> None:
-        """Delete the file from the device.
+        """Delete the file from the GenieACS container.
 
         :param filename: name of the file with absolute path
         :type filename: str
-        :raises NotImplementedError: missing implementation
+        :raises NotSupportedError: if no console connection configured
         """
-        raise NotImplementedError
+        if hasattr(self, "_console") and self._console:
+            self.console.sendline(f"rm -f {filename}")
+            self.console.expect(self._shell_prompt)
+        else:
+            raise NotSupportedError("delete_file requires console connection to GenieACS container")
 
     def scp_device_file_to_local(self, local_path: str, source_path: str) -> None:
-        """Copy a local file from a server using SCP.
+        """Copy a file from GenieACS container to local system using SCP.
 
         :param local_path: local file path
-        :param source_path: source path
-        :raises NotImplementedError: missing implementation
+        :param source_path: source path in container
+        :raises NotSupportedError: if no console connection configured
         """
-        raise NotImplementedError
+        if hasattr(self, "_console") and self._console:
+            import subprocess
+            port = self.config.get("port", 22)
+            user = self.config.get("username", "root")
+            host = self.config.get("ip_addr", self.config.get("ipaddr", "localhost"))
+            subprocess.run(
+                ["scp", "-P", str(port), f"{user}@{host}:{source_path}", local_path],
+                check=True,
+            )
+        else:
+            raise NotSupportedError("scp_device_file_to_local requires console connection to GenieACS container")
+
+    @cached_property
+    def ipv4_addr(self) -> str:
+        """Return the IPv4 address of GenieACS container.
+
+        :return: IPv4 address in string format
+        :rtype: str
+        """
+        return self.config.get("ip_addr", self.config.get("ipaddr", "localhost"))
+
+    @cached_property
+    def ipv6_addr(self) -> str:
+        """Return the IPv6 address of GenieACS container.
+
+        :return: IPv6 address in string format
+        :rtype: str
+        :raises NotSupportedError: if IPv6 not configured
+        """
+        if ipv6 := self.config.get("ipv6_addr"):
+            return ipv6
+        raise NotSupportedError("IPv6 address not configured for GenieACS")
+
+    def start_tcpdump(
+        self,
+        interface: str,
+        port: str | None,
+        output_file: str = "pkt_capture.pcap",
+        filters: dict | None = None,
+        additional_filters: str | None = "",
+    ) -> str:
+        """Start tcpdump capture on GenieACS container interface.
+
+        :param interface: interface name where packets to be captured
+        :type interface: str
+        :param port: port number, can be a range of ports (eg: 7547 or 7547-7567)
+        :type port: str
+        :param output_file: pcap file name, defaults to pkt_capture.pcap
+        :type output_file: str
+        :param filters: filters as key value pair (eg: {"-v": "", "-c": "4"})
+        :type filters: dict, optional
+        :param additional_filters: additional filters
+        :type additional_filters: str, optional
+        :raises NotSupportedError: if no console connection configured
+        :return: console output and tcpdump process id
+        :rtype: str
+        """
+        if not (hasattr(self, "_console") and self._console):
+            raise NotSupportedError("tcpdump requires console connection to GenieACS container")
+
+        cmd = f"tcpdump -i {interface} -w {output_file}"
+        if port:
+            cmd += f" port {port}"
+        if filters:
+            for key, value in filters.items():
+                cmd += f" {key} {value}"
+        if additional_filters:
+            cmd += f" {additional_filters}"
+        cmd += " &"
+
+        self.console.sendline(cmd)
+        self.console.expect(self._shell_prompt)
+        self.console.sendline("echo $!")
+        self.console.expect(self._shell_prompt)
+        pid = self.console.before.strip().split()[-1]
+        return pid
+
+    def stop_tcpdump(self, process_id: str) -> None:
+        """Stop tcpdump capture.
+
+        :param process_id: tcpdump process id
+        :type process_id: str
+        :raises NotSupportedError: if no console connection configured
+        """
+        if not (hasattr(self, "_console") and self._console):
+            raise NotSupportedError("tcpdump requires console connection to GenieACS container")
+
+        self.console.sendline(f"kill {process_id}")
+        self.console.expect(self._shell_prompt)
 
     # TODO: This hack has to be done to make skip-boot a separate flow
     # The solution should be removed in the future and should not build upon
@@ -569,19 +686,28 @@ class GenieACS(LinuxDevice, ACS):
 
     @property
     def console(self) -> BoardfarmPexpect:
-        """Returns ACS console.
+        """Returns ACS console for administration.
 
-        :raises NotSupportedError: does not support SSH
+        :return: console connection to GenieACS container
+        :rtype: BoardfarmPexpect
+        :raises NotSupportedError: if no console connection configured
         """
-        raise NotSupportedError
+        if hasattr(self, "_console") and self._console:
+            return self._console
+        raise NotSupportedError("No console connection configured for GenieACS")
 
     @property
     def firewall(self) -> IptablesFirewall:
         """Returns Firewall iptables instance.
 
-        :raises NotSupportedError: does not support Firewall
+        :return: firewall iptables instance with console object
+        :rtype: IptablesFirewall
+        :raises NotSupportedError: if no console connection configured
         """
-        raise NotSupportedError
+        if hasattr(self, "_console") and self._console:
+            from boardfarm3.lib.networking import IptablesFirewall
+            return IptablesFirewall(self._console)
+        raise NotSupportedError("Firewall requires console connection to GenieACS container")
 
 
 if __name__ == "__main__":
