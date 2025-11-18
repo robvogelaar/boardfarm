@@ -96,6 +96,40 @@ class CPEHW(ABC):
         """
         raise NotImplementedError
 
+    def flash_ab_partition(
+        self,
+        image: str,
+        image_host: str,
+        image_username: str = "root",
+        image_password: str | None = None,
+        image_base_path: str = "/firmware",
+    ) -> None:
+        """Flash firmware using A/B partition update mechanism.
+
+        This method performs a firmware update on devices with A/B partition
+        schemes (e.g., RPi RDK-B). The inactive partition is flashed, verified,
+        and set as the next boot target.
+
+        This is an optional method - not all CPE devices support A/B partitions.
+        Devices that implement this should use their hardware abstraction layer
+        for the actual flash operations.
+
+        :param image: Image filename (e.g., "firmware.wic", "rootfs.img")
+        :type image: str
+        :param image_host: SSH server hosting the firmware image
+        :type image_host: str
+        :param image_username: SSH username for image server, defaults to "root"
+        :type image_username: str
+        :param image_password: SSH password for image server (optional if using keys)
+        :type image_password: str | None
+        :param image_base_path: Base directory path on image server, defaults to "/firmware"
+        :type image_base_path: str
+        :raises NotImplementedError: if device doesn't support A/B partition flash
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support A/B partition flash"
+        )
+
     @abstractmethod
     def disconnect_from_consoles(self) -> None:
         """Disconnect/Close the console connections."""

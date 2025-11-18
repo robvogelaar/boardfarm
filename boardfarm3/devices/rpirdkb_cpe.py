@@ -22,6 +22,7 @@ from boardfarm3.exceptions import (
 )
 from boardfarm3.lib.connection_factory import connection_factory
 from boardfarm3.lib.cpe_sw import CPESwLibraries
+from boardfarm3.lib.hal.rpi_flash import RPiFlashManager
 from boardfarm3.lib.hal.rpirdkb_wifi import RPiRDKBWiFi
 from boardfarm3.lib.power import get_pdu
 from boardfarm3.lib.utils import retry_on_exception
@@ -195,27 +196,91 @@ class RPiRDKBHW(CPEHW):
         self._console.expect("Booting Linux on physical CPU")
         self._console.expect("automatic login")
 
+    def flash_ab_partition(
+        self,
+        image: str,
+        image_host: str,
+        image_username: str = "root",
+        image_password: str | None = None,
+        image_base_path: str = "/firmware",
+    ) -> None:
+        """Flash RPi RDK-B firmware using A/B partition update.
+
+        Delegates to RPiFlashManager HAL module for the actual flash operation.
+
+        The RPi uses an A/B partition scheme with two root partitions
+        (mmcblk0p2 and mmcblk0p3). This method flashes the inactive partition
+        and updates the boot configuration to switch partitions on next boot.
+
+        Image type is automatically detected using fdisk:
+        - Raw partition image: fdisk shows no partition table -> direct copy
+        - WIC image: fdisk shows partition table -> extract Linux partition
+
+        :param image: Image filename (e.g., "firmware.wic", "rootfs.img")
+        :type image: str
+        :param image_host: SSH server hosting the firmware image
+        :type image_host: str
+        :param image_username: SSH username for image server, defaults to "root"
+        :type image_username: str
+        :param image_password: SSH password for image server (optional if using keys)
+        :type image_password: str | None
+        :param image_base_path: Base directory path on image server, defaults to "/firmware"
+        :type image_base_path: str
+        :raises BoardfarmException: on flash failure
+        """
+        # Create flash manager and delegate to HAL
+        flasher = RPiFlashManager(self._console, self._config)
+        flasher.flash(
+            image=image,
+            image_host=image_host,
+            image_username=image_username,
+            image_password=image_password,
+            image_base_path=image_base_path,
+        )
+
     def flash_via_bootloader(
         self,
-        image: str,  # noqa: ARG002
+        image: str,
         tftp_devices: dict[str, TFTP],  # noqa: ARG002
         termination_sys: TerminationSystem = None,  # noqa: ARG002
         method: str | None = None,  # noqa: ARG002
     ) -> None:
-        """Flash cpe via the bootloader.
+        """Flash RPi RDK-B firmware using A/B partition update.
 
-        :param image: image name
+        This method delegates to flash_ab_partition() for backward compatibility.
+        New code should use flash_ab_partition() directly.
+
+        Image source is determined by inventory config:
+        - flash_image.host: Remote host IP/hostname
+        - flash_image.username: SSH username (default: root)
+        - flash_image.password: SSH password (optional if key-based auth)
+        - flash_image.base_path: Base directory for images (default: /firmware)
+
+        :param image: Image filename (with extension .img or .wic)
         :type image: str
-        :param tftp_devices: a list of LAN side TFTP devices
+        :param tftp_devices: TFTP devices (not used for RPi flash)
         :type tftp_devices: dict[str, TFTP]
-        :param termination_sys: the termination system device (e.g. CMTS),
-            defaults to None
+        :param termination_sys: Termination system (not used for RPi flash)
         :type termination_sys: TerminationSystem
-        :param method: flash method, defaults to None
-        :type method: str, optional
-        :raises NotSupportedError: docker container cannot be flashed
+        :param method: Flash method override (not used, A/B always used)
+        :type method: str | None
+        :raises BoardfarmException: on flash failure
         """
-        raise NotSupportedError
+        # Get image server configuration from inventory
+        flash_config = self._config.get("flash_image", {})
+
+        if not flash_config.get("host"):
+            msg = "Image host not configured in inventory (flash_image.host)"
+            raise BoardfarmException(msg)
+
+        # Delegate to flash_ab_partition
+        self.flash_ab_partition(
+            image=image,
+            image_host=flash_config.get("host"),
+            image_username=flash_config.get("username", "root"),
+            image_password=flash_config.get("password"),
+            image_base_path=flash_config.get("base_path", "/firmware"),
+        )
 
     def wait_for_hw_boot(self) -> None:
         """Wait for CPE to have WAN interface added.
