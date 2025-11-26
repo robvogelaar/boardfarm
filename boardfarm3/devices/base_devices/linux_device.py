@@ -65,6 +65,7 @@ class LinuxDevice(BoardfarmDevice):
         self._console: BoardfarmPexpect = None
         self._shell_prompt = [DEFAULT_BASH_SHELL_PROMPT_PATTERN]
         self._static_route = ""
+        self.dante = False  # Default: dante proxy not configured
         if "options" in self._config:
             options = [x.strip() for x in self._config["options"].split(",")]
             for opt in options:
@@ -1352,8 +1353,9 @@ class LinuxDevice(BoardfarmDevice):
         self._console.execute_command(
             f"ifconfig {interface} {ip_address} netmask {netmask} up"
         )
-        ip = self.ipv4_addr
-        if ip != ip_address:
+        # Verify IP was set on the specified interface
+        ip = self.get_interface_ipv4addr(interface=interface)
+        if ip != str(ip_address):
             err_msg = f"Running IP: {ip=} is different than expected: {ip_address=}"
             raise CodeError(err_msg)
 
@@ -1394,7 +1396,7 @@ class LinuxDevice(BoardfarmDevice):
         if str(ip_address) not in out.lower():
             err_msg = f"Failed to add default route, ip route output: {out}"
             raise CodeError(err_msg)
-        __LOGGER.debug("The route is configured successfully .")
+        logging.getLogger(__name__).debug("The route is configured successfully .")
 
     def start_nping(  # pylint: disable=too-many-arguments # noqa: PLR0913
         self,
