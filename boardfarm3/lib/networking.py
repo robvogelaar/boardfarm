@@ -94,7 +94,8 @@ def start_tcpdump(  # noqa: PLR0913
     if port:
         output = console.execute_command(f"{command} 'portrange {port}' {filter_str} &")
     else:
-        output = console.execute_command(f"{command} {filter_str} &")
+        # Quote filter_str to prevent shell interpretation of special characters
+        output = console.execute_command(f"{command} '{filter_str}' &") if filter_str.strip() else console.execute_command(f"{command} &")
     if console.expect_exact([f"tcpdump: listening on {interface}", pexpect.TIMEOUT], timeout=5):
         msg = f"Failed to start tcpdump on {interface}"
         raise ValueError(msg)
@@ -111,8 +112,11 @@ def stop_tcpdump(console: _LinuxConsole, process_id: str) -> None:
     :raises ValueError: on failed to stop tcpdump process
     """
     output = console.execute_command(f"kill {process_id}")
+    # If process already dead, skip waiting for capture stats
+    if "No such process" in output:
+        return
     if "packets captured" not in output:
-        idx = console.expect_exact(["captured", pexpect.TIMEOUT])
+        idx = console.expect_exact(["captured", pexpect.TIMEOUT], timeout=5)
         if idx:
             msg = f"Failed to stop tcpdump process with PID {process_id}"
             raise ValueError(msg)
