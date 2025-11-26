@@ -159,6 +159,15 @@ class RPiRDKBHW(CPEHW):
         except pexpect.TIMEOUT:
             pass
 
+        # Suppress kernel console messages for serial connections
+        # This prevents kernel audit logs from appearing in command output
+        if connection_type == "serial":
+            try:
+                self._console.sendline("dmesg -n 1")
+                self._console.expect(self._shell_prompt, timeout=2)
+            except pexpect.TIMEOUT:
+                pass  # Best effort - don't fail if dmesg not available
+
     def get_console(self, console_name: str) -> BoardfarmPexpect:
         """Return console instance with the given name.
 
