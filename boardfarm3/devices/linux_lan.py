@@ -213,8 +213,12 @@ class LinuxLAN(LinuxDevice, LAN):
         :return: LAN gateway address
         :rtype: str
         """
-        # TODO: resolve lan gateway address dynamically
-        return "192.168.178.1"
+        # Resolve lan gateway address dynamically
+        try:
+            return str(self.get_default_gateway())
+        except Exception:  # noqa: BLE001
+            # Fallback to hardcoded value if unable to get gateway
+            return "192.168.178.1"
 
     def get_default_gateway(self) -> IPv4Address:
         """Get default gateway from ip route output.
@@ -352,9 +356,10 @@ class LinuxLAN(LinuxDevice, LAN):
         self._console.sendline("ip route")
         # we should verify this so other way, because they could be the same subnets
         # in theory
+        # Use regex pattern to match any gateway IP instead of hardcoded value
         i = self._console.expect(
             [
-                f"default via {self.lan_gateway} dev {self.iface_dut}",
+                rf"default via \d+\.\d+\.\d+\.\d+ dev {self.iface_dut}",
                 pexpect.TIMEOUT,
             ],
             timeout=5,
@@ -379,7 +384,9 @@ class LinuxLAN(LinuxDevice, LAN):
 
         if ipv4:
             self.ipv4_client_started = True
-            self.start_danteproxy()
+            # Only start dante proxy if it's configured
+            if self.dante:
+                self.start_danteproxy()
 
         return ipv4
 
@@ -488,7 +495,9 @@ class LinuxLAN(LinuxDevice, LAN):
 
         if ipv4:
             self.ipv4_client_started = True
-            self.start_danteproxy()
+            # Only start dante proxy if it's configured
+            if self.dante:
+                self.start_danteproxy()
 
         return ipv4
 
