@@ -40,7 +40,7 @@ def _is_async_hook_supported(hook_name: str, device_manager: DeviceManager) -> b
         return True
     # inform the user about the devices that are missing the asyncio implementation
     for device in bio_set - aio_set:
-        _LOGGER.warning(
+        _LOGGER.debug(
             "Consider adding the implementation of %s to %s. "
             "It would allow the full usage of asyncio at this stage.",
             async_hook_name,
