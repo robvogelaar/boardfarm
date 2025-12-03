@@ -111,7 +111,12 @@ class BoardfarmPexpect(pexpect.spawn, metaclass=ABCMeta):
                 encoding="utf-8",
             )
             handler.setFormatter(Formatter("%(asctime)s %(message)s"))
+            handler.setLevel("DEBUG")  # Always capture DEBUG to file
             logger.addHandler(handler)
+            # Ensure logger accepts DEBUG messages for file handler
+            # even if global logging level is INFO
+            if logger.level > 10:  # 10 = DEBUG
+                logger.setLevel("DEBUG")
         self.logfile_read = _LogWrapper(logger)
 
     def get_last_output(self) -> str:
