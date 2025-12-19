@@ -120,7 +120,10 @@ class RPiRDKBHW(CPEHW):
         :return: the shell prompt
         :rtype: list[str]
         """
-        return [r"root@RaspberryPi-Gateway:.*#"]
+        return [
+            r"root@RaspberryPi-Gateway:.*#",
+            r"root@raspberrypi4-rdk-broadband:.*[#$]",
+        ]
 
     def connect_to_consoles(self, device_name: str) -> None:
         """Establish connection to the device console.
