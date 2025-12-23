@@ -1128,8 +1128,7 @@ class LinuxDevice(BoardfarmDevice):
         :return: the process id(pid) and log file path
         :rtype: tuple[int , str]
         """
-        file_path = tempfile.gettempdir()
-        log_file_path = f"{file_path}/iperf_server_logs.txt"
+        log_file_path = tempfile.mktemp(prefix="iperf_server_", suffix=".txt")
         if udp_only:
             version = ""
             self._console.execute_command(
@@ -1195,8 +1194,7 @@ class LinuxDevice(BoardfarmDevice):
         :return: the process id(pid) and log file path
         :rtype: tuple[int , str]
         """
-        file_path = tempfile.gettempdir()
-        log_file_path = f"{file_path}/iperf_client_logs.txt"
+        log_file_path = tempfile.mktemp(prefix="iperf_client_", suffix=".txt")
         if udp_only:
             version = ""
             self._console.execute_command(
