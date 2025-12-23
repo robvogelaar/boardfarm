@@ -708,6 +708,7 @@ class RPiRDKBCPE(CPE, BoardfarmDevice):
             self._sw._set_up_terminal()
         except Exception as e:
             _LOGGER.warning("Failed to set up terminal: %s", e)
+            raise
 
     def get_interactive_consoles(self) -> dict[str, BoardfarmPexpect]:
         """Get interactive consoles of the device.
