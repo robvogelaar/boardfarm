@@ -213,12 +213,18 @@ class RPiRDKBHW(CPEHW):
         image: str,
         image_host: str,
         image_username: str = "root",
-        image_password: str | None = None,
-        image_base_path: str = "/firmware",
+        image_password: str = "bigfoot1",
+        image_base_path: str = "/tmp",
+        wan_device: object = None,
+        rpi_ip: str = None,
     ) -> None:
         """Flash RPi RDK-B firmware using A/B partition update.
 
         Delegates to RPiFlashManager HAL module for the actual flash operation.
+
+        The image should be available on the WAN container (10.101.0.x)
+        with standard credentials (root/bigfoot1). Use the standalone
+        rpi_flash.py script to copy images from build servers first.
 
         The RPi uses an A/B partition scheme with two root partitions
         (mmcblk0p2 and mmcblk0p3). This method flashes the inactive partition
@@ -228,20 +234,30 @@ class RPiRDKBHW(CPEHW):
         - Raw partition image: fdisk shows no partition table -> direct copy
         - WIC image: fdisk shows partition table -> extract Linux partition
 
+        When wan_device and rpi_ip are provided, commands are executed via SSH
+        through the WAN container instead of the serial console. This is more
+        reliable for noisy serial connections.
+
         :param image: Image filename (e.g., "firmware.wic", "rootfs.img")
         :type image: str
-        :param image_host: SSH server hosting the firmware image
+        :param image_host: WAN container static IP (e.g., 10.101.0.20)
         :type image_host: str
-        :param image_username: SSH username for image server, defaults to "root"
+        :param image_username: SSH username, defaults to "root"
         :type image_username: str
-        :param image_password: SSH password for image server (optional if using keys)
-        :type image_password: str | None
-        :param image_base_path: Base directory path on image server, defaults to "/firmware"
+        :param image_password: SSH password, defaults to "bigfoot1"
+        :type image_password: str
+        :param image_base_path: Base directory path, defaults to "/tmp"
         :type image_base_path: str
+        :param wan_device: Optional WAN device for SSH command execution
+        :type wan_device: object
+        :param rpi_ip: Optional RPi IP address for SSH access via WAN
+        :type rpi_ip: str
         :raises BoardfarmException: on flash failure
         """
         # Create flash manager and delegate to HAL
-        flasher = RPiFlashManager(self._console, self._config)
+        flasher = RPiFlashManager(
+            self._console, self._config, wan_device=wan_device, rpi_ip=rpi_ip
+        )
         flasher.flash(
             image=image,
             image_host=image_host,
