@@ -243,8 +243,9 @@ class GenieACS(LinuxDevice, ACS):
         result = []
         for key, value in flattened_dict.items():
             if "_value" in key:
+                param_key = key.removesuffix("._value")
                 result.append(
-                    f"{key.strip('._value')}, {value}, "
+                    f"{param_key}, {value}, "
                     f"{flattened_dict[key.replace('_value', '_type')]}",
                 )
         return ", ".join(result)
@@ -253,7 +254,12 @@ class GenieACS(LinuxDevice, ACS):
         self,
         response_data: Any,  # noqa: ANN401
     ) -> list[dict[str, Any]]:
-        elements = self._convert_to_string(response_data[0]).split(", ")
+        if not response_data:
+            return []
+        converted = self._convert_to_string(response_data[0])
+        if not converted:
+            return []
+        elements = converted.split(", ")
         return [
             dict(zip(("key", "value", "type"), elements[i : i + 3]))
             for i in range(0, len(elements), 3)
@@ -265,34 +271,46 @@ class GenieACS(LinuxDevice, ACS):
         timeout: int | None = None,
         cpe_id: str | None = None,
     ) -> GpvResponse:
-        """Send GetParamaterValues command via ACS server.
-
-        :param param: TR069 parameters to get values of
-        :type param: GpvInput
-        :param timeout: wait time for the RPC to complete, defaults to None
-        :type timeout: int | None, optional
-        :param cpe_id: CPE identifier, defaults to None
-        :type cpe_id: str | None, optional
-        :return: GPV response with keys, value and datatype
-        :rtype: GpvResponse
-        """
+        """Send GetParamaterValues command via ACS server."""
         cpe_id = cpe_id if cpe_id else self._cpeid
-        quoted_id = quote('{"_id":"' + cpe_id + '"}', safe="")
-        self._request_post(
+
+        post_response = self._request_post(
             endpoint="/devices/" + quote(cpe_id) + "/tasks",
             data=self._build_input_structs_gpv(param),
             conn_request=True,
             timeout=timeout,
         )
+
+        if "parameterValues" in post_response:
+            return GpvResponse(self._parse_gpv_task_result(post_response["parameterValues"]))
+
+        # Fallback to database query (works for cached params like DeviceInfo)
+        return GpvResponse(self._query_device_params(cpe_id, param, timeout=5))
+
+    def _query_device_params(
+        self,
+        cpe_id: str,
+        param: GpvInput,
+        timeout: int,
+    ) -> list[dict[str, Any]]:
+        """Query device parameters from GenieACS database."""
+        quoted_id = quote('{"_id":"' + cpe_id + '"}', safe="")
         response_data = self._request_get(
-            "/devices"  # noqa: ISC003
-            + "?query="
-            + quoted_id
-            + "&projection="
-            + self._build_input_structs(param),
+            f"/devices?query={quoted_id}&projection={self._build_input_structs(param)}",
             timeout=timeout,
         )
-        return GpvResponse(self._convert_response(response_data))
+        return self._convert_response(response_data)
+
+    def _parse_gpv_task_result(
+        self,
+        parameter_values: list[list[Any]],
+    ) -> list[dict[str, Any]]:
+        """Parse GPV task result [[name, value, type], ...] into list of dicts."""
+        return [
+            {"key": p[0], "value": str(p[1]), "type": p[2]}
+            for p in parameter_values
+            if len(p) >= 3  # noqa: PLR2004
+        ]
 
     def _build_input_structs_gpv(self, param_value: str | list[str]) -> dict[str, Any]:
         if isinstance(param_value, list):
@@ -304,16 +322,10 @@ class GenieACS(LinuxDevice, ACS):
         param_value: dict[str, Any] | list[dict[str, Any]],
     ) -> dict[str, Any]:
         data = []
-        for spv_params in param_value:
-            if isinstance(spv_params, dict):
-                data.append(
-                    [
-                        f"{iter(spv_params.keys())}",
-                        iter(spv_params.values()),
-                    ],
-                )
-            elif isinstance(spv_params, str) and isinstance(param_value, dict):
-                data.append([spv_params, param_value[spv_params]])
+        items = [param_value] if isinstance(param_value, dict) else param_value
+        for entry in items:
+            for k, v in entry.items():
+                data.append([k, v])
         return {"name": "setParameterValues", "parameterValues": data}
 
     def _request_post(
@@ -323,17 +335,15 @@ class GenieACS(LinuxDevice, ACS):
         conn_request: bool = True,
         timeout: int | None = None,
     ) -> Any:  # noqa: ANN401
-        if conn_request:
-            request_url = urljoin(self._base_url, f"{endpoint}?connection_request")
-        else:
-            err_msg = (
-                "It is unclear how the code would work without 'conn_request' "
-                "being True. /FC"
-            )
-            raise ValueError(err_msg)
+        if not conn_request:
+            raise ValueError("conn_request must be True")
+        # Use 30s timeout for GenieACS to wait for task completion
+        request_url = urljoin(
+            self._base_url,
+            f"{endpoint}?connection_request&timeout=30000",
+        )
         try:
-            timeout = timeout if timeout else GenieACS.CPE_wait_time
-            response = self._client.post(request_url, json=data, timeout=timeout)
+            response = self._client.post(request_url, json=data, timeout=45)
             response.raise_for_status()
         except (httpx.ConnectError, httpx.HTTPError) as exc:
             raise ConnectionError from exc
