@@ -4,6 +4,7 @@ from boardfarm3.devices.power.kasa import KasaPDU
 from boardfarm3.devices.power.lxd import LXDPDU
 from boardfarm3.devices.power.net_io import NetIOPDU
 from boardfarm3.devices.power.raritan_pdu import RaritanPDU
+from boardfarm3.devices.power.servertech_pdu import ServerTechPDU
 from boardfarm3.templates.pdu import PDU
 
 pdu_dict = {
@@ -12,6 +13,7 @@ pdu_dict = {
     "netio://": NetIOPDU,
     "kasa://": KasaPDU,
     "lxd://": LXDPDU,
+    "servertech://": ServerTechPDU,
 }
 
 
