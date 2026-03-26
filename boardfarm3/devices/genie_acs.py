@@ -17,6 +17,7 @@ from boardfarm3.exceptions import (
     BoardfarmException,
     ContingencyCheckError,
     NotSupportedError,
+    TR069FaultCode,
 )
 from boardfarm3.lib.utils import retry_on_exception
 from boardfarm3.templates.acs import ACS, GpvInput, GpvResponse, SpvInput
@@ -347,7 +348,30 @@ class GenieACS(LinuxDevice, ACS):
             response.raise_for_status()
         except (httpx.ConnectError, httpx.HTTPError) as exc:
             raise ConnectionError from exc
-        return response.json()
+        result = response.json()
+        self._check_fault(result)
+        return result
+
+    def _check_fault(self, result: Any) -> None:
+        if not isinstance(result, dict):
+            return
+        fault = result.get("fault")
+        if not fault:
+            return
+        fault_code = fault.get("code", "")
+        fault_message = fault.get("message", "")
+        numeric_code = fault_code.rsplit(".", 1)[-1] if "." in fault_code else fault_code
+        faultdict = {
+            "spv_fault": [
+                {
+                    "FaultCode": numeric_code,
+                    "FaultString": fault_message,
+                }
+            ]
+        }
+        exc = TR069FaultCode(f"CWMP Fault {fault_code}: {fault_message}")
+        exc.faultdict = faultdict
+        raise exc
 
     def SPV(
         self,
