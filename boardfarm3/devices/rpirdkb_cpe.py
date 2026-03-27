@@ -87,14 +87,14 @@ class RPiRDKBHW(CPEHW):
     def serial_number(self) -> str:
         """Get CPE Serial number.
 
-        :return: MAC address
+        :return: serial number
         :rtype: str
         """
         if self._console:
             return self._console.execute_command(
-                "grep Serial /proc/cpuinfo |awk '{print $3}'",
-            )
-        return self._config.get("serial")
+                "grep Serial /proc/cpuinfo | awk '{print $3}'",
+            ).strip()
+        return self._config.get("serial", "")
 
     @property
     def wan_iface(self) -> str:
@@ -328,7 +328,7 @@ class RPiRDKBSW(CPESwLibraries):  # pylint: disable=R0904
     """RPiRDKB software component device class."""
 
     _hw: RPiRDKBHW
-    _use_oui = False
+    _use_oui = True
 
     def __init__(self, hardware: RPiRDKBHW) -> None:
         """Initialise the RPiRDKB sofware class.
