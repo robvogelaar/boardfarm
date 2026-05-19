@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from functools import cached_property
 from ipaddress import AddressValueError, IPv4Address
 from time import sleep
@@ -125,12 +126,28 @@ class RPiRDKBHW(CPEHW):
             r"root@raspberrypi4-rdk-broadband:.*[#$]",
         ]
 
+    def _slot_index(self) -> int:
+        """Return the trailing integer of the inventory slot key (mikrotik1 -> 1).
+
+        :raises BoardfarmException: when the slot cannot be derived
+        """
+        resource_name = self._config.get("resource_name", "")
+        match = re.search(r"(\d+)$", str(resource_name))
+        if not match:
+            msg = (
+                f"could not derive slot index from resource_name "
+                f"{resource_name!r}; wan_ssh/lan_ssh needs a numeric suffix"
+            )
+            raise BoardfarmException(msg)
+        return int(match.group(1))
+
     def connect_to_consoles(self, device_name: str) -> None:
         """Establish connection to the device console.
 
         :param device_name: device name
         :type device_name: str
         """
+        self._device_name = device_name
         connection_type = str(self._config.get("connection_type"))
 
         # Build connection parameters based on connection type
@@ -152,6 +169,11 @@ class RPiRDKBHW(CPEHW):
             conn_params["port"] = self._config.get("port", 22)
             if "password" in self._config:
                 conn_params["password"] = self._config["password"]
+        elif connection_type in ("wan_ssh", "lan_ssh"):
+            # SSH-as-console via the slot's docker container. Slot derived
+            # from inventory key (e.g. "mikrotik1" -> 1); CPE IP is
+            # auto-discovered (wan: dropbear-banner scan; lan: default-gw).
+            conn_params["slot"] = self._slot_index()
 
         self._console = connection_factory(**conn_params)
         self._console.login_to_server()
@@ -205,8 +227,45 @@ class RPiRDKBHW(CPEHW):
         if not get_pdu(self._config.get("powerport")).power_cycle():
             msg = "Failed to power cylce CPE via PDU"
             raise BoardfarmException(msg)
-        self._console.expect("Booting Linux on physical CPU")
-        self._console.expect("automatic login")
+        self._wait_for_console_after_reboot()
+
+    def _wait_for_console_after_reboot(self, timeout: int = 240) -> None:
+        """Wait for the CPE console to be usable again after a reboot.
+
+        Selection is keyed off ``connection_type`` from the inventory:
+
+        * ``serial`` - watch the kernel/login banners on the live serial
+          stream (the historical behaviour).
+        * anything else (``wan_ssh`` / ``lan_ssh`` /
+          ``ssh_connection`` / ``authenticated_ssh``) - tear down the
+          dead session and re-open ``connect_to_consoles`` until the
+          SSH endpoint is reachable again. Boot banners never appear on
+          an SSH session into an already-rebooted system, so polling is
+          the only viable signal.
+
+        :param timeout: max seconds to wait for the console to recover
+        :raises BoardfarmException: if the console is not reachable within
+            ``timeout`` seconds (SSH path only)
+        """
+        connection_type = str(self._config.get("connection_type"))
+        if connection_type == "serial":
+            self._console.expect("Booting Linux on physical CPU", timeout=timeout)
+            self._console.expect("automatic login", timeout=timeout)
+            return
+        self.disconnect_from_consoles()
+        last_err: Exception | None = None
+        for _ in range(max(1, timeout // 5)):
+            try:
+                self.connect_to_consoles(self._device_name)
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+                sleep(5)
+            else:
+                return
+        msg = f"CPE SSH console not reachable within {timeout}s"
+        if last_err is not None:
+            msg = f"{msg}: {last_err}"
+        raise BoardfarmException(msg)
 
     def flash_ab_partition(
         self,
@@ -491,8 +550,7 @@ class RPiRDKBSW(CPESwLibraries):  # pylint: disable=R0904
             "Device.X_CISCO_COM_DeviceControl.FactoryReset",
             "Router,Wifi,Firewall",
         )
-        self._console.expect("Booting Linux on physical CPU")
-        self._console.expect("automatic login")
+        self._hw._wait_for_console_after_reboot()  # noqa: SLF001
         return True
 
     def wait_for_boot(self) -> None:

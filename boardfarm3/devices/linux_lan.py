@@ -6,7 +6,7 @@ import binascii
 import logging
 import re
 from argparse import Namespace
-from ipaddress import AddressValueError, IPv4Address
+from ipaddress import AddressValueError, IPv4Address, IPv4Interface
 from typing import TYPE_CHECKING, Any
 
 import jc
@@ -118,19 +118,38 @@ class LinuxLAN(LinuxDevice, LAN):
         await self._connect_async()
         self._add_multicast_to_linux_lan()
 
-    @hookimpl
+    @hookimpl(tryfirst=True)
     def boardfarm_skip_boot(self) -> None:
-        """Boardfarm hook implementation to initialize LAN device."""
+        """Boardfarm hook implementation to initialize LAN device.
+
+        ``tryfirst=True`` ensures LAN containers are connected and any
+        ``lan-static-ip`` is applied before board devices try to use them
+        (e.g. as an SSH ``ProxyCommand`` jump host).
+        """
         _LOGGER.info("Booting %s(%s) device", self.device_name, self.device_type)
         self._connect()
+        self._setup_lan()
         self._add_multicast_to_linux_lan()
 
-    @hookimpl
+    @hookimpl(tryfirst=True)
     async def boardfarm_skip_boot_async(self) -> None:
         """Boardfarm hook implementation to initialize LAN device."""
         _LOGGER.info("Booting %s(%s) device", self.device_name, self.device_type)
         await self._connect_async()
+        self._setup_lan()
         self._add_multicast_to_linux_lan()
+
+    def _setup_lan(self) -> None:
+        """Apply LAN-side suboptions (e.g. lan-static-ip) on iface_dut."""
+        for opt, opt_val in self._parse_device_suboptions().items():
+            if opt == "lan-static-ip":
+                ipv4_interface = IPv4Interface(opt_val)
+                self._console.execute_command(
+                    f"ip -4 addr del {ipv4_interface} dev {self.iface_dut}",
+                )
+                self._console.execute_command(
+                    f"ip -4 addr add {ipv4_interface} dev {self.iface_dut}",
+                )
 
     @hookimpl
     def boardfarm_shutdown_device(self) -> None:

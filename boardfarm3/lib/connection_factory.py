@@ -4,6 +4,7 @@ from typing import Any
 
 from boardfarm3.exceptions import EnvConfigError
 from boardfarm3.lib.boardfarm_pexpect import BoardfarmPexpect
+from boardfarm3.lib.connections.cpe_console_ssh import LanSSHConsole, WanSSHConsole
 from boardfarm3.lib.connections.ldap_authenticated_serial import LdapAuthenticatedSerial
 from boardfarm3.lib.connections.local_cmd import LocalCmd
 from boardfarm3.lib.connections.ser2net_connection import Ser2NetConnection
@@ -28,6 +29,8 @@ def connection_factory(
     connection_dispatcher = {
         "ssh_connection": SSHConnection,
         "authenticated_ssh": SSHConnection,
+        "wan_ssh": WanSSHConsole,
+        "lan_ssh": LanSSHConsole,
         "ldap_authenticated_serial": LdapAuthenticatedSerial,
         "local_cmd": LocalCmd,
         "serial": SerialConnection,
